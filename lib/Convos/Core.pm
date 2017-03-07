@@ -8,6 +8,8 @@ use Mojo::Home;
 use Mojo::Util 'trim';
 use Mojolicious::Plugins;
 
+$ENV{CONVOS_SKIP_CONNECT} //= $ENV{CONVOS_COMMAND_LINE};
+
 has backend => sub { Convos::Core::Backend->new };
 has home    => sub { Mojo::Home->new($ENV{CONVOS_HOME}); };
 

@@ -26,4 +26,7 @@ $t->post_ok('/api/user/login', json => {email => 'superman@example.com', passwor
 
 $t->get_ok('/api/user')->status_is(200);
 
+# make sure this url does not exist from web
+$t->get_ok('/user/recover/superman@example.com')->status_is(404);
+
 done_testing;

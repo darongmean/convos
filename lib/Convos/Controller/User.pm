@@ -62,6 +62,37 @@ sub logout {
   );
 }
 
+sub recover {
+  my $self  = shift;
+  my $email = $self->stash('email');
+  my $exp   = $self->stash('exp');
+  my $redirect_url;
+
+  # expired
+  return $self->render(status => 410) if $exp < time;
+
+  for my $secret (@{$self->app->secrets}) {
+    my $check = Mojo::Util::hmac_sha1_sum("$email/$exp", $secret);
+    next if $check ne $self->stash('check');
+    $redirect_url = $self->url_for('index');
+    last;
+  }
+
+  return $self->render(status => 400) unless $redirect_url;
+
+  $redirect_url->query->param(recover => 1);
+  $self->session(email => $email)->redirect_to($redirect_url);
+}
+
+sub enable_recover {
+  my $self  = shift;
+  my $email = $self->stash('email');
+  my $exp   = time - int(rand 3600) + 3600 * 12 + 1800;
+  my $check = Mojo::Util::hmac_sha1_sum("$email/$exp", $self->app->secrets->[0]);
+
+  $self->render(text => $self->url_for(recover => {check => $check, exp => $exp}));
+}
+
 sub register {
   my $self = shift->openapi->valid_input or return;
 

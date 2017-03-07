@@ -66,13 +66,16 @@ sub startup {
   push @{$self->renderer->classes}, __PACKAGE__;
 
   # Add basic routes
-  $r->get('/')->to(template => 'convos')->name('index');
+  $r->get('/')->to(template => 'index')->name('index');
   $r->get('/custom/asset/*file' => \&_action_custom_asset);
+  $r->get('/user/recover/*email/:exp/:check')->to('user#recover')->name('recover');
+  $r->get('/user/recover/*email')->to('user#enable_recover') if $ENV{CONVOS_COMMAND_LINE};
   $r->websocket('/events')->to('events#start')->name('events');
 
   $self->_api_spec;
   $self->_plugins;
   $self->_setup_secrets;
+  $self->_assets;
 
   # Autogenerate routes from the OpenAPI specification
   $self->plugin(OpenAPI => {url => delete $self->{_api_spec}});
@@ -82,9 +85,6 @@ sub startup {
 
   # Add /perldoc route for documentation
   $self->plugin('PODRenderer')->to(module => 'Convos');
-
-  # Skip building on travis
-  $ENV{TRAVIS_BUILD_ID} ? $self->helper(asset => sub { }) : $self->_assets;
 
   $self->hook(
     before_dispatch => sub {
@@ -113,6 +113,11 @@ sub _action_custom_asset {
 sub _assets {
   my $self          = shift;
   my $custom_assets = $self->core->home->rel_file('assets');
+
+  # Skip building on travis
+  if ($ENV{TRAVIS_BUILD_ID} or $ENV{CONVOS_COMMAND_LINE}) {
+    return $self->helper(asset => sub { });
+  }
 
   $self->plugin(AssetPack => {pipes => [qw(Favicon Vuejs JavaScript Sass Css Combine Reloader)]});
 
@@ -379,19 +384,32 @@ __DATA__
     %= asset 'reloader.js' if app->mode eq 'development';
   </body>
 </html>
-@@ convos.html.ep
+@@ footer.html.ep
+<div class="row">
+  <div class="col s12 about">
+  % if (config('organization_url') ne 'http://convos.by') {
+    <a href="<%= config('organization_url') %>"><%= config('organization_name') %></a> -
+  % }
+    <a href="http://convos.by">About</a> -
+    <a href="http://convos.by/doc">Documentation</a> -
+    <a href="http://convos.by/blog">Blog</a>
+  </div>
+</div>
+@@ header.html.ep
+<div class="row">
+  <div class="col s12">
+    <h1>Convos</h1>
+    <p><i>- Collaboration done right.</i></p>
+  </div>
+</div>
+@@ index.html.ep
 % layout 'convos';
 % title config('organization_name') eq 'Convos' ? 'Convos - Better group chat' : 'Convos for ' . config('organization_name');
 <component :is="user.currentPage" :current-page.sync="currentPage" :user="user">
   <div id="loader">
     <div class="row not-logged-in-wrapper">
       <div class="col s12 m6 offset-m3">
-        <div class="row">
-          <div class="col s12">
-            <h1>Convos</h1>
-            <p><i>- Collaboration done right.</i></p>
-          </div>
-        </div>
+        %= include 'header'
         <div class="row">
           <div class="col s12">
             <p class="if-js">Loading Convos should not take too long...</p>
@@ -406,17 +424,36 @@ __DATA__
             <a href="" class="btn waves-effect waves-light">Reload</a>
           </div>
         </div>
-        <div class="row">
-          <div class="col s12 about">
-          % if (config('organization_url') ne 'http://convos.by') {
-            <a href="<%= config('organization_url') %>"><%= config('organization_name') %></a> -
-          % }
-            <a href="http://convos.by">About</a> -
-            <a href="http://convos.by/doc">Documentation</a> -
-            <a href="http://convos.by/blog">Blog</a>
-          </div>
-        </div>
+        %= include 'footer'
       </div>
     </div>
   </div>
+</component>
+@@ user/recover.html.ep
+% layout 'convos';
+% title 'Convos - Recover password';
+<div class="row not-logged-in-wrapper">
+  <div class="col s12 m6 offset-m3">
+    %= include 'header'
+    <div class="row">
+      <div class="col s12">
+        <h2><%= $c->res->default_message($status) %> (<%= $status %>)</h2>
+      % if ($status == 410) {
+        <p>The token has expired. Please ask for a new.</p>
+      % } elsif ($status != 200) {
+        <p>
+          Possibly hacker attempt, or typo in the URL.
+          Please try again, or ask for a new recovery token.
+        </p>
+      % }
+      </div>
+    </div>
+    <div class="row">
+      <div class="col s12">
+        %= link_to 'Get instructions', 'index', class => 'btn waves-effect waves-light'
+      </div>
+    </div>
+    %= include 'footer'
+  </div>
+</div>
 </component>
