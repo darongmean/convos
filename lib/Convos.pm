@@ -69,7 +69,7 @@ sub startup {
   $r->get('/')->to(template => 'index')->name('index');
   $r->get('/custom/asset/*file' => \&_action_custom_asset);
   $r->get('/user/recover/*email/:exp/:check')->to('user#recover')->name('recover');
-  $r->get('/user/recover/*email')->to('user#enable_recover') if $ENV{CONVOS_COMMAND_LINE};
+  $r->get('/user/recover/*email')->to('user#generate_recover_url') if $ENV{CONVOS_COMMAND_LINE};
   $r->websocket('/events')->to('events#start')->name('events');
 
   $self->_api_spec;

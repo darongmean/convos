@@ -22,6 +22,15 @@ sub delete {
   );
 }
 
+sub generate_recover_url {
+  my $self  = shift;
+  my $email = $self->stash('email');
+  my $exp   = time - int(rand 3600) + 3600 * 12 + 1800;
+  my $check = Mojo::Util::hmac_sha1_sum("$email/$exp", $self->app->secrets->[0]);
+
+  $self->render(text => $self->url_for(recover => {check => $check, exp => $exp}));
+}
+
 sub get {
   my $self = shift->openapi->valid_input or return;
   my $user = $self->backend->user        or return $self->unauthorized;
@@ -84,15 +93,6 @@ sub recover {
   $self->session(email => $email)->redirect_to($redirect_url);
 }
 
-sub enable_recover {
-  my $self  = shift;
-  my $email = $self->stash('email');
-  my $exp   = time - int(rand 3600) + 3600 * 12 + 1800;
-  my $check = Mojo::Util::hmac_sha1_sum("$email/$exp", $self->app->secrets->[0]);
-
-  $self->render(text => $self->url_for(recover => {check => $check, exp => $exp}));
-}
-
 sub register {
   my $self = shift->openapi->valid_input or return;
 
@@ -151,6 +151,10 @@ user related actions.
 
 See L<Convos::Manual::API/deleteUser>.
 
+=head2 generate_recover_url
+
+Used to generate a URL suitable for L</recover>.
+
 =head2 get
 
 See L<Convos::Manual::API/getUser>.
@@ -162,6 +166,12 @@ See L<Convos::Manual::API/loginUser>.
 =head2 logout
 
 See L<Convos::Manual::API/logoutUser>.
+
+=head2 recover
+
+Used to validate a recover URL, with email, expiration date and a checksum.
+
+=head2 related
 
 =head2 register
 
